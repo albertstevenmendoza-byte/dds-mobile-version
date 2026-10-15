@@ -1,0 +1,381 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   novus-mobile.css  —  Novus Foods 1730 Ops Hub  —  Mobile / touch layer
+   ---------------------------------------------------------------------------
+   Load AFTER novus-styles.css on every page:
+     <link rel="stylesheet" href="novus-mobile.css">
+   Pair with novus-mobile.js (bottom tab bar, keyboard + viewport helpers).
+
+   Everything here is gated behind a media query, so desktop (>1024px with a
+   mouse) renders exactly as before.
+
+   Breakpoints
+     ≤1024px  tablet portrait / large phone landscape  → tab bar replaces nav
+     ≤768px   phone                                    → single-column layouts
+     ≤380px   small phone                              → tighter grids
+     (pointer:coarse)  any touch device                → 44px tap targets,
+                                                          16px inputs (no iOS zoom)
+═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --tabbar-h: 58px;
+  /* Real visible viewport height (kept fresh by novus-mobile.js; falls back to dvh/vh) */
+  --vh: 1vh;
+  --app-h: 100vh;
+}
+@supports (height: 100dvh) { :root { --app-h: 100dvh; } }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   0.  ALWAYS-ON SAFE DEFAULTS  (harmless on desktop)
+─────────────────────────────────────────────────────────────────────────── */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+img, svg, video, canvas { max-width: 100%; }
+body { overflow-wrap: break-word; }
+/* …but never break numbers/mono values mid-word */
+.metric-value, .t-metric, .psb-metric-val, .timer-display, .freshness-badge { overflow-wrap: normal; }
+
+/* Tab bar element is injected by novus-mobile.js — hidden unless a mobile query turns it on */
+.nv-tabbar { display: none; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   1.  TOUCH DEVICES  (any width)
+─────────────────────────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  html { touch-action: manipulation; }                 /* removes 300ms tap delay + double-tap zoom */
+
+  /* 16px inputs stop iOS Safari auto-zooming the page on focus */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select, textarea,
+  .na-input, .form-input, .form-select, .form-textarea, .lean-fi, .lean-status-sel,
+  .task-input, .help-search, .cw-field-row select, .cw-field-row input, .interval-sel {
+    font-size: 16px !important;
+  }
+
+  /* 44px minimum tap targets */
+  .btn, .btn-cmd, .btn-sm, .toggle-btn, .na-add-btn, .cw-add-btn, .wsm-btn,
+  .timer-btn, .modal-tab, .add-item-btn, .paste-btn, .scale-btn, .tool-btn {
+    min-height: 44px;
+  }
+  .btn-cmd-icon { width: 44px; height: 44px; }
+  .sd-item { min-height: 46px; padding: 10px 12px; font-size: .92rem; }
+  .cmd-tab { padding: 10px 14px; }
+  .cv-close, .roe-close, .na-close, .maint-close, .help-close, .modal-x, .cw-close,
+  .lean-hd-close, #tile-zoom-close { min-width: 44px; min-height: 44px; }
+  .hub-logout { min-height: 40px; padding: 8px 14px; }
+
+  /* Bigger, thumb-friendly check targets (visual size unchanged, hit area enlarged) */
+  .checkbox-btn { position: relative; }
+  .checkbox-btn::after { content: ''; position: absolute; inset: -11px; }
+  .na-check, #table-body input[type="checkbox"] { width: 22px !important; height: 22px !important; }
+  .dot { position: relative; }
+  .dot::after { content: ''; position: absolute; inset: -9px; }
+
+  /* Hover lifts stick on touch — turn the movement off */
+  .hl-card:hover, .hub-card:hover, .pretty-card:hover, .net-mini:hover, .center-net-mini:hover,
+  .cv-value-row:hover, .gallery-item:hover, .dot:hover { transform: none !important; }
+  .pretty-card:hover .card-image-wrap img { transform: none; }
+
+  /* Hover-only controls must be reachable by finger */
+  .admin-toolbar { opacity: 1 !important; }
+  .custom-widget-remove { opacity: 1 !important; }
+  .resizer { display: none !important; }               /* mouse-only corner resize handle */
+}
+
+/* Touch scrolling feel inside every scroll container */
+.cv-panel, .roe-panel, .na-panel, .help-panel, .maint-panel, .cw-panel, #modal, .modal-body,
+.panel-body, .items-list, .notes-container, .lean-list, .tree, .cmd-nav { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   2.  TABLET & BELOW  (≤1024px) — bottom tab bar replaces the hidden top nav
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .cmd-header { height: calc(var(--nav-h) + var(--safe-t)); padding-top: var(--safe-t); padding-left: max(16px, var(--safe-l)); padding-right: max(16px, var(--safe-r)); }
+  .plant-status-bar { top: calc(var(--nav-h) + var(--safe-t)); }
+
+  /* backdrop-filter makes the header a containing block for position:fixed
+     children, which would trap the bottom-sheet menu. Solid fill instead
+     (also much cheaper to paint on phones). */
+  .cmd-header, .hub-topbar, .top-nav {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: rgba(255,255,255,.97);
+  }
+
+  body.has-tabbar { padding-bottom: calc(var(--tabbar-h) + var(--safe-b)); }
+  body.has-tabbar.kbd-open { padding-bottom: 0; }
+  body.has-tabbar .cmd-left > a[href="hub.html"] { display: none; }   /* Hub lives in the tab bar now */
+
+  .nv-tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 250; /* below header (300) so the ··· sheet covers it */
+    height: calc(var(--tabbar-h) + var(--safe-b));
+    padding: 0 var(--safe-r) var(--safe-b) var(--safe-l);
+    background: rgba(255,255,255,.96);
+    -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+    border-top: 1px solid rgba(0,0,0,.09);
+    box-shadow: 0 -4px 18px rgba(0,0,0,.05);
+    transition: transform .2s var(--ease);
+  }
+  body.kbd-open .nv-tabbar { transform: translateY(110%); }
+  .nv-tab {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--text-3); text-decoration: none; font-size: .64rem; font-weight: 600; letter-spacing: .01em;
+    padding: 6px 2px; position: relative; -webkit-user-select: none; user-select: none;
+    transition: color var(--dur-fast) var(--ease);
+  }
+  .nv-tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .nv-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.1; }
+  .nv-tab:active { transform: scale(.94); }
+  .nv-tab.active { color: var(--green); }
+  .nv-tab.active::before { content: ''; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--green); }
+}
+/* Short landscape phones: slimmer bar, icons only */
+@media (max-width: 1024px) and (max-height: 460px) {
+  :root { --tabbar-h: 46px; }
+  .nv-tab { flex-direction: row; gap: 6px; font-size: .7rem; }
+  .nv-tab svg { width: 18px; height: 18px; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   3.  PHONE  (≤768px) — shared chrome
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --nav-h: 52px; --psb-h: 34px; }
+
+  /* ── Header ── */
+  .cmd-header { gap: 8px; }
+  .cmd-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
+  .cmd-right { gap: 6px; flex: 0 0 auto; }
+  .cmd-divider { display: none; }
+  .cmd-logo { height: 22px; }
+  .freshness-badge { padding: 4px 8px; font-size: .66rem; max-width: 118px; }
+  .freshness-badge span { overflow: hidden; text-overflow: ellipsis; }
+  #btn-sp { padding: 8px 12px; }
+
+  /* ── ··· menu becomes a bottom sheet ── */
+  .settings-dropdown, .more-dropdown {
+    position: fixed !important; left: 0; right: 0; bottom: 0; top: auto !important; width: auto;
+    max-height: 82vh; max-height: min(82vh, calc(var(--app-h) - 56px));
+    overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 20px 20px 0 0; padding: 8px 10px calc(10px + var(--safe-b));
+    background: rgba(255,255,255,.99);
+    box-shadow: 0 0 0 100vmax rgba(15,23,42,.38), 0 -10px 40px rgba(0,0,0,.22);
+    z-index: 9999 !important;
+    animation: nvSheetUp .26s var(--spring) both;
+  }
+  .more-dropdown::before { content: ''; display: block; width: 38px; height: 4px; border-radius: 4px; background: rgba(0,0,0,.18); margin: 2px auto 8px; }
+  .sd-item svg { width: 18px; height: 18px; }
+  @keyframes nvSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+
+  /* ── Plant status bar: keep the useful metrics, drop the clutter ── */
+  .plant-status-bar { height: auto; min-height: var(--psb-h); padding: 6px 16px; }
+  .psb-inner { flex-wrap: wrap; gap: 4px 14px; }
+  .psb-right { display: flex !important; gap: 12px; flex-wrap: wrap; }
+  .psb-right .psb-metric-sep, #psb-clock { display: none; }
+  .psb-metric-label { font-size: .6rem; }
+
+  /* ── Generic page frame ── */
+  .page { padding: 16px max(14px, var(--safe-l)) 40px max(14px, var(--safe-r)); }
+  .page-top, .header-flex { flex-direction: column; align-items: flex-start !important; gap: 10px; margin-bottom: 18px !important; }
+  .page-title { font-size: 1.45rem !important; line-height: 1.2; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .plant-tag { margin-left: 0 !important; white-space: nowrap; }
+  .cmd-left > a[href="hub.html"] { white-space: nowrap; flex-shrink: 0; }
+  .summary-label { overflow-wrap: normal; }
+  .timeframe-title { font-size: .72rem; letter-spacing: .03em; text-align: center; }
+  .sync-meta { width: 100%; justify-content: space-between; }
+  .panel-header { padding: 11px 14px; }
+  .panel-body { padding: 12px 14px 14px; overflow-x: auto; }
+  .data-table { font-size: .78rem; }
+  .data-table th, .data-table td { padding-left: 6px; padding-right: 6px; }
+
+  /* ── Full-screen overlays (Core Values / Rules / Needs Action) ── */
+  .cv-panel, .roe-panel, .na-panel {
+    height: var(--app-h) !important; max-height: var(--app-h) !important; width: 100vw;
+    padding: calc(20px + var(--safe-t)) max(16px, var(--safe-l)) calc(28px + var(--safe-b)) max(16px, var(--safe-r)) !important;
+  }
+  .cv-sub, .roe-sub { margin-bottom: 20px; }
+  .cv-panel-title, .roe-panel-title, .na-title, .help-panel-title, .maint-panel-title { font-size: 1rem; }
+
+  /* Needs-Action overlay: stack the add form, tidy the cards */
+  .na-add-form { flex-wrap: wrap; }
+  .na-add-form .na-input, .na-input[type="date"] { width: 100% !important; flex: 1 1 100%; }
+  .na-add-form .na-add-btn { width: 100%; }
+  .na-summary { flex-wrap: wrap; gap: 6px; }
+  .na-card { flex-wrap: wrap; }
+  .na-card-meta { white-space: normal; }
+
+  /* Help + Maintenance: sheet-style panels */
+  #help-overlay, #maint-overlay { align-items: flex-end; }
+  .help-panel, .maint-panel {
+    width: 100vw !important; max-height: 92vh; max-height: calc(var(--app-h) - 24px - var(--safe-t));
+    border-radius: 20px 20px 0 0; padding: 20px 16px calc(24px + var(--safe-b));
+  }
+  .maint-card-header { flex-wrap: wrap; gap: 10px; }
+  .maint-card-right { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .maint-why, .maint-steps { padding-left: 14px; padding-right: 14px; }
+  .maint-code { font-size: .72rem; overflow-x: auto; }
+
+  /* Custom-widget modal (dashboard) → bottom sheet */
+  #cw-overlay { align-items: flex-end !important; }
+  .cw-panel { width: 100vw !important; max-height: calc(var(--app-h) - 24px); border-radius: 20px 20px 0 0; padding: 18px 16px calc(22px + var(--safe-b)); }
+  .cw-row-2 { grid-template-columns: 1fr; }
+
+  /* Toasts sit above the tab bar */
+  .wsm-toast-container { left: 12px !important; right: 12px !important; top: calc(var(--nav-h) + var(--safe-t) + 8px) !important; }
+  .toast { bottom: calc(var(--tabbar-h) + var(--safe-b) + 12px) !important; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   4.  PAGE: DDS DASHBOARD  (dds-dashboard.html)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* 12-col grid with inline `grid-column: span N` → one column */
+  .dash-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px; margin: 12px 0; }
+  .dash-grid > .panel { grid-column: 1 / -1 !important; min-width: 0; }
+  .panel { height: auto !important; }                    /* undo any desktop-resized heights */
+  .panel:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06); border-color: rgba(0,0,0,.15); }
+
+  .highlights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hl-card { padding: 16px 10px 14px; }
+  .hl-name { font-size: 1.05rem; }
+
+  .prod-split { grid-template-columns: 1fr; gap: 14px; }
+  .split-row { flex-direction: column; gap: 10px; }
+  /* Fixed 500px blocks in the Production panel */
+  .split-row > .metric-row[style] { width: 100% !important; margin-top: 0 !important; }
+  .metric-row { flex-wrap: wrap; }
+  .metric-box { flex: 1 1 calc(50% - 8px); min-width: 120px; }
+  .metric-value { font-size: 1.5rem; }
+  .chart-wrap { max-width: 100%; }
+
+  .custom-widget-zone { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .sp-bar { padding-left: 14px; padding-right: 14px; }
+
+  /* Panels are drag-reorderable on desktop; keep touch scrolling smooth */
+  .panel-header { touch-action: pan-y; }
+}
+@media (max-width: 380px) {
+  .highlights-grid { grid-template-columns: 1fr; }
+  .metric-box { flex-basis: 100%; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   5.  PAGE: ANNOUNCEMENTS  (dds-announcements.html)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .board-container { grid-template-columns: minmax(0, 1fr) !important; gap: 16px !important; }
+  .pretty-card { border-radius: 16px; }
+  .card-image-wrap { height: 170px; }
+  .card-content { padding: 18px 16px 14px; }
+  .card-body { font-size: 1rem; margin-bottom: 14px; }
+  .card-footer { padding: 10px 16px; }
+  .card-controls { flex-wrap: wrap; gap: 10px; }
+  .color-dots { gap: 12px; }
+  .dot.active { transform: none; }
+  .admin-toolbar { flex-wrap: wrap; }
+  .tool-btn { padding: 8px 12px; }
+  .skeleton-card { height: 260px; }
+
+  .gallery-overlay { padding: 0; place-items: end stretch; }
+  .gallery-window { max-width: none; border-radius: 20px 20px 0 0; padding: 20px 16px calc(22px + var(--safe-b)); max-height: calc(var(--app-h) - 24px); overflow-y: auto; }
+  .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gallery-item { height: 100px; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   6.  PAGE: PLAY CALL  (play-call.html)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .manager-header { padding: 11px 14px; }
+  .task-input-wrap { padding: 10px 12px; position: sticky; top: calc(var(--nav-h) + var(--safe-t)); z-index: 5; }
+  .task-item { padding: 14px 14px; gap: 14px; }
+  .checkbox-btn { width: 28px; height: 28px; }
+  .task-text { font-size: .98rem; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   7.  PAGE: NEEDS ACTION  (needs-action.html)  — table → card list
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .summary-row { gap: 8px; margin-bottom: 14px; }
+  .summary-card { padding: 12px 10px; text-align: center; min-width: 0; }
+  .summary-label { font-size: .6rem; letter-spacing: .04em; }
+  .summary-value { font-size: 1.5rem; }
+  .add-panel-body { padding: 14px; }
+  .add-grid { grid-template-columns: 1fr; }
+  .table-panel-header { flex-wrap: wrap; gap: 8px; }
+
+  .table-panel > div[style*="overflow-x"] { overflow-x: visible !important; }
+  .table-panel .data-table { min-width: 0 !important; display: block; }
+  .table-panel .data-table thead { display: none; }
+  .table-panel .data-table tbody { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .table-panel .data-table tr {
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: start;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    box-shadow: var(--shadow-xs);
+  }
+  .table-panel .data-table td { display: block; padding: 0 !important; border: 0 !important; text-align: left !important; background: none !important; }
+  .table-panel .data-table td::before { content: attr(data-label); display: block; font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-4); margin-bottom: 2px; }
+  .table-panel .data-table td:nth-child(2) { grid-column: 1 / -1; font-size: .95rem; line-height: 1.45; color: var(--text-1); order: -1; }
+  .table-panel .data-table td:nth-child(2)::before { display: none; }
+  .table-panel .data-table td:nth-child(6) { grid-column: 2; grid-row: 2 / span 2; align-self: center; }
+  .table-panel .data-table td:nth-child(6)::before { display: none; }
+  .table-panel .data-table td[colspan] { grid-column: 1 / -1; text-align: center !important; }
+  .table-panel .data-table td[colspan]::before { display: none; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   8.  PAGE: WEEKLY KPIs wrapper  (weekly-kpis.html — hosts kpi-boards in an iframe)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  html, body { height: var(--app-h); }
+  .kpi-strip { padding: 10px 14px 8px; }
+  .kpi-strip h1 { font-size: 1.25rem; }
+  .kpi-frame { min-height: 0; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   9.  PAGE: HUB  (hub.html)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hub-topbar { padding: var(--safe-t) max(14px, var(--safe-r)) 0 max(14px, var(--safe-l)); height: calc(52px + var(--safe-t)); }
+  .hub-user { gap: 8px; }
+  .hub-user > span, .hub-user .hub-user-name, .hub-user .hub-role { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub-main { padding: 28px 16px calc(32px + var(--safe-b)); gap: 28px; justify-content: flex-start; }
+  .hub-headline { font-size: 1.6rem; }
+  .hub-sub { font-size: .9rem; }
+  .hub-cards { width: 100%; gap: 14px; }
+  .hub-card { width: 100% !important; max-width: 520px; }
+  .hub-card-body { padding: 22px 18px 18px; }
+  .hub-card-cta { padding: 14px; font-size: .9rem; }
+  .hub-card-plant-picker select { min-height: 44px; }
+  .hub-product-strip { height: 150px; }
+  .hub-footer { padding-bottom: calc(20px + var(--safe-b)); }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   10.  PAGE: LOGIN  (index.html)
+─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  body { overflow-y: auto !important; overflow-x: hidden; min-height: var(--app-h); }
+  html, body { height: auto; }
+  .login-panel { padding: 24px max(18px, var(--safe-r)) calc(36px + var(--safe-b)) max(18px, var(--safe-l)) !important; }
+  .login-card { padding: 26px 20px !important; max-width: 100%; border-radius: 18px; }
+  .brand-panel { padding: calc(22px + var(--safe-t)) 20px 18px !important; }
+  .brand-tiles { gap: 6px; }
+}
+@media (max-width: 820px) and (pointer: coarse) {
+  .login-card input, .login-card select, .login-card button { min-height: 48px; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   11.  REDUCED MOTION + PRINT
+─────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .edge-anim, .deco-node, .center-net-mini, .freshness-dot, .psb-dot { animation: none !important; }
+}
+@media print { .nv-tabbar { display: none !important; } body.has-tabbar { padding-bottom: 0; } }
+
+/* Page scroll lock while a full-screen overlay is open (class toggled by novus-mobile.js) */
+@media (max-width: 1024px) { body.nv-scroll-lock { overflow: hidden; touch-action: none; } }
