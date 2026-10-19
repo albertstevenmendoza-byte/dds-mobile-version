@@ -255,6 +255,24 @@ body { overflow-wrap: break-word; }
   /* Panels are drag-reorderable on desktop; keep touch scrolling smooth */
   .panel-header { touch-action: pan-y; }
 }
+@media (max-width: 768px) {
+  /* Startup-actions popover (click a STARTUP pill) → bottom sheet; JS-set left/top are overridden */
+  #sa-pop {
+    left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto !important;
+    max-height: calc(var(--app-h) - 80px); border-radius: 20px 20px 0 0; padding-bottom: calc(10px + var(--safe-b));
+    box-shadow: 0 0 0 100vmax rgba(15,23,42,.4), 0 -10px 40px rgba(0,0,0,.22); z-index: 9999;
+  }
+  .sa-head { padding: 14px 16px; font-size: .85rem; }
+  .sa-body { padding: 8px 16px 12px; font-size: .9rem; }
+  .sa-item { padding: 10px 0; gap: 12px; }
+  .sa-item input[type=checkbox] { width: 22px; height: 22px; }
+  .sa-x, .sa-rm { min-width: 44px; min-height: 44px; font-size: 1.3rem; }
+  .sa-add input, .sa-add button { min-height: 44px; }
+  .sa-pill { padding: 8px 8px; }
+  /* Near misses by department table */
+  .nm-table { font-size: .85rem; }
+  .nm-table td { padding: 8px 0; }
+}
 @media (max-width: 380px) {
   .highlights-grid { grid-template-columns: 1fr; }
   .metric-box { flex-basis: 100%; }
@@ -379,3 +397,6 @@ body { overflow-wrap: break-word; }
 
 /* Page scroll lock while a full-screen overlay is open (class toggled by novus-mobile.js) */
 @media (max-width: 1024px) { body.nv-scroll-lock { overflow: hidden; touch-action: none; } }
+
+/* Icons inside header buttons must not be squeezed by flex */
+.btn-cmd svg, .btn-cmd-icon svg { flex: none; }

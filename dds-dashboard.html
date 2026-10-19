@@ -253,6 +253,31 @@
     .pill-no  { background:rgba(220,38,38,.08); color:var(--red-l); }
     .pill-label { opacity:.55; font-size:.56rem; }
 
+    /* Startup actions: clickable STARTUP pill + small popover */
+    .sa-pill { cursor:pointer; transition:filter .12s; }
+    .sa-pill:hover { filter:brightness(.96); }
+    .sa-pill:focus-visible { outline:2px solid rgba(59,130,246,.5); outline-offset:1px; }
+    .sa-warn { margin-left:5px; font-size:.62rem; color:var(--amber); opacity:1; }
+    #sa-pop { position:fixed; z-index:9000; width:290px; max-height:70vh; overflow:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); box-shadow:0 8px 24px rgba(0,0,0,.14); display:none; font-size:.76rem; }
+    #sa-pop.sa-open { display:block; }
+    .sa-head { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border-bottom:1px solid var(--border); font-weight:700; font-size:.72rem; color:var(--text-1); }
+    .sa-x { background:none; border:0; cursor:pointer; color:var(--text-3); font-size:1rem; line-height:1; padding:0 2px; }
+    .sa-body { padding:6px 12px 10px; }
+    .sa-empty { color:var(--text-4); padding:8px 0; }
+    .sa-item { display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid var(--border); }
+    .sa-item:last-child { border-bottom:0; }
+    .sa-item input[type=checkbox] { margin-top:2px; }
+    .sa-txt { flex:1; color:var(--text-1); word-break:break-word; }
+    .sa-meta { display:block; color:var(--text-4); font-size:.64rem; margin-top:1px; }
+    .sa-done .sa-txt { color:var(--text-4); text-decoration:line-through; }
+    .sa-rm { background:none; border:0; cursor:pointer; color:var(--text-4); font-size:.9rem; line-height:1; }
+    .sa-rm:hover { color:var(--red-l); }
+    .sa-toggle { background:none; border:0; cursor:pointer; color:var(--text-3); font-size:.68rem; padding:6px 0 0; }
+    .sa-add { display:flex; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); flex-wrap:wrap; }
+    .sa-add input { flex:1 1 100%; border:1px solid var(--border); border-radius:4px; padding:5px 7px; font:inherit; }
+    .sa-add input.sa-owner { flex:1 1 60%; }
+    .sa-add button { border:1px solid var(--border); background:var(--surface-2,#f5f5f7); border-radius:4px; padding:5px 10px; font:inherit; font-weight:700; cursor:pointer; }
+
     /* Resizer handle */
     .resizer { position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; clip-path:polygon(100% 0,100% 100%,0 100%); background:linear-gradient(135deg,var(--border2),var(--green)); opacity:0; transition:opacity .2s; border-radius:0 0 var(--radius) 0; }
     .panel:hover .resizer { opacity:.4; }
@@ -468,6 +493,13 @@
           <div class="metric-box"><div class="metric-label">Days Without Incident</div><div class="metric-value" id="days-incident" contenteditable="true" oninput="saveManual(this.id)">—</div></div>
           <div class="metric-box"><div class="metric-label">Near Misses</div><div class="metric-value" id="near-misses" contenteditable="true" oninput="saveManual(this.id)">—</div></div>
           <div class="metric-box"><div class="metric-label">Safety Audits</div><div class="metric-value" id="safety-audits" contenteditable="true" oninput="saveManual(this.id)">—</div></div>
+        </div>
+        <div class="nm-breakdown" id="nm-breakdown">
+          <div class="nm-title">Near Misses by Department</div>
+          <table class="nm-table">
+            <thead><tr><th>Department</th><th>Open</th><th>Closed</th></tr></thead>
+            <tbody id="nm-tbody"><tr><td colspan="3" class="nm-empty">—</td></tr></tbody>
+          </table>
         </div>
       </div>
       <div class="resizer"></div>
@@ -742,6 +774,42 @@ function regression(y){const n=y.length;if(n<2)return y;let sx=0,sy=0,sxy=0,sx2=
 
 // [migrated above]
 
+// Near misses by department for the Safety panel: how many are Open and how
+// many are Closed. Each department adds two columns to its own sheet --
+// "Near Miss Open" and "Near Miss Closed" -- holding the current count.
+// These are status counts, so the LATEST row that has a value is used (not a
+// fixed date); if one date has several rows (e.g. Production lines) they are
+// summed. A blank column shows "—" (not reported), never 0. Hover a number
+// to see the date it was reported.
+const NM_FIELDS={
+  open:  ['Near Miss Open','Near Misses Open','Open Near Misses','Open Near Miss'],
+  closed:['Near Miss Closed','Near Misses Closed','Closed Near Misses','Closed Near Miss']
+};
+function renderNearMissBreakdown(depts){
+  const tb=document.getElementById('nm-tbody');if(!tb)return;
+  const limit=new Date();limit.setDate(limit.getDate()+1);const limitDS=toDS(new Date(Date.UTC(limit.getFullYear(),limit.getMonth(),limit.getDate())));
+  const latest=(rows,names)=>{
+    let best=null,sum=0;
+    rows.forEach(r=>{
+      const ds=toDS(parseDate(r.Date));if(!ds||ds>limitDS)return;
+      let n=null;for(const f of names){const v=valByKey(r,f);if(v!=null&&v!==''&&!isNaN(Number(v))){n=Number(v);break;}}
+      if(n==null)return;
+      if(best===null||ds>best){best=ds;sum=n;}else if(ds===best){sum+=n;}
+    });
+    return best===null?null:{n:sum,ds:best};
+  };
+  const asOf=ds=>{const d=new Date(ds+'T00:00:00Z');return 'As of '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});};
+  const cell=(t,hot)=>t==null?'<span class="nm-na">—</span>':'<span title="'+asOf(t.ds)+'">'+(hot&&t.n>0?'<b class="nm-hot">'+t.n+'</b>':t.n)+'</span>';
+  let sumO=0,sumC=0,anyO=false,anyC=false,html='';
+  depts.forEach(([name,rows])=>{
+    const o=latest(rows,NM_FIELDS.open),c=latest(rows,NM_FIELDS.closed);
+    if(o){sumO+=o.n;anyO=true;}if(c){sumC+=c.n;anyC=true;}
+    html+='<tr><td>'+name+'</td><td>'+cell(o,true)+'</td><td>'+cell(c,false)+'</td></tr>';
+  });
+  html+='<tr class="nm-total"><td>Total</td><td>'+(anyO?(sumO>0?'<b class="nm-hot">'+sumO+'</b>':'0'):'<span class="nm-na">—</span>')+'</td><td>'+(anyC?sumC:'<span class="nm-na">—</span>')+'</td></tr>';
+  tb.innerHTML=html;
+}
+
 function renderDashboard(){
   if(!workbook)return;
   GLOBAL_MAX_DATE=null;
@@ -780,6 +848,7 @@ function renderDashboard(){
   [['date-safety',dHR],['date-quality',dQA],['date-costs',dFin],['date-hr',dHR],['date-sap',dSAP],['date-warehouse',dWH],['date-inventory',dInv]].forEach(([id,d])=>checkStale(id,d));
 
   // Safety/HR
+  renderNearMissBreakdown([['Production',prod],['QA',qa],['Maintenance',maint],['Warehouse',bpWH],['Inventory Control',inv],['SAP',sap],['Finance',fin],['HR | Training',hr]]);
   set('days-incident',getVal(hr,'Days Without Incident',dHR));set('near-misses',getVal(hr,'Near Miss Reports',dHR));set('safety-audits',getVal(hr,'Safety Audits',dHR));set('meal-penalties',getVal(hr,'Number of Meal Penalties',dHR));
   const trainVal=getVal(hr,'Trainings Complete',dHR)??0;set('trainings',pct(trainVal));
   const hcd=Number(getVal(hr,'Head Count - Direct',dHR)||0),hci=Number(getVal(hr,'Head Count - Indirect',dHR)||0);set('headcount',(hcd+hci)>0?hcd+hci:null);
@@ -800,8 +869,9 @@ function renderDashboard(){
       const oeeN=m.oee!=null?(Number(m.oee)<=2?Number(m.oee):Number(m.oee)/100):null;
       const cls=oeeN==null?'':oeeN<=.60?'td-red':oeeN<.65?'td-amber':'td-green';
       const tr=document.createElement('tr');tr.innerHTML=`<td style="font-weight:700">${line}</td><td class="${cls}">${pct(m.oee)}</td><td>${pct(m.att,1)}</td><td>${m.dt!=null?m.dt.toFixed(0)+'m':'—'}</td>`;tbody.appendChild(tr);
-      const card=document.createElement('div');card.className='readiness-card';card.innerHTML=`<div class="readiness-line">${line}</div><div class="status-pill ${m.startup==='Yes'?'pill-yes':'pill-no'}"><span class="pill-label">STARTUP</span><span>${m.startup==='Yes'?'✓':'✗'}</span></div><div class="status-pill ${m.cil==='Yes'?'pill-yes':'pill-no'}"><span class="pill-label">CIL</span><span>${m.cil==='Yes'?'✓':'✗'}</span></div>`;grid.appendChild(card);
+      const card=document.createElement('div');card.className='readiness-card';card.innerHTML=`<div class="readiness-line">${line}</div><div class="status-pill sa-pill ${m.startup==='Yes'?'pill-yes':'pill-no'}" data-line="${line}" role="button" tabindex="0" title="Startup actions"><span class="pill-label">STARTUP<span class="sa-warn" hidden>⚠</span></span><span>${m.startup==='Yes'?'✓':'✗'}</span></div><div class="status-pill ${m.cil==='Yes'?'pill-yes':'pill-no'}"><span class="pill-label">CIL</span><span>${m.cil==='Yes'?'✓':'✗'}</span></div>`;grid.appendChild(card);
     });
+    if(typeof updateStartupBadges==='function')updateStartupBadges();
   }
   buildProdSection((window.ACTIVE_PLANT&&window.ACTIVE_PLANT.lines)||[],'tbody-lines','readiness-lines');
   // Top drivers -- Power-Automate-authored text field, always the latest PA day
@@ -1134,6 +1204,7 @@ async function fetchFromSharePoint(){
     // "Manage Custom Widgets" in the ··· menu). Loaded here so
     // renderDashboard() below can draw them from fresh data right away.
     await loadCustomWidgets();
+    await loadStartupActions();
 
     workbook = { _json: true };
     renderDashboard();
@@ -1664,6 +1735,120 @@ if(window.NovusDB && NovusDB.customWidgets && NovusDB.customWidgets.subscribe){
     const overlay=document.getElementById('cw-overlay');
     if(overlay && overlay.classList.contains('cw-visible')) cwRenderList();
   });
+}
+</script>
+
+<!-- Startup actions popover (opened from a line's STARTUP pill) -->
+<div id="sa-pop" role="dialog" aria-label="Startup actions"></div>
+<script>
+// ══ STARTUP ACTIONS ═══════════════════════════════════════════════════════
+// Per-line action list attached to the STARTUP pill. Everyone can read it;
+// admins can add / complete / remove. A small amber ⚠ appears on the pill
+// when that line has open actions. Needs startup_actions.sql run once.
+let STARTUP_ACTIONS = [];
+let SA_LINE = null, SA_SHOW_DONE = false, SA_DB_OK = true;
+const saEsc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const saOpen = line => STARTUP_ACTIONS.filter(a=>a.line===line && !a.completed_at);
+
+async function loadStartupActions(){
+  STARTUP_ACTIONS = [];
+  if(!window.NovusDB || !NovusDB.startupActions || !window.ACTIVE_PLANT){ SA_DB_OK=false; return; }
+  try{
+    const { data, error } = await NovusDB.startupActions.getAll(window.ACTIVE_PLANT.id);
+    if(error){ SA_DB_OK=false; console.warn('startup_actions load failed (run startup_actions.sql?):', error.message); return; }
+    SA_DB_OK=true; STARTUP_ACTIONS = data || [];
+  }catch(e){ SA_DB_OK=false; console.warn('startup_actions load failed (non-fatal):', e); }
+}
+
+function updateStartupBadges(){
+  document.querySelectorAll('.sa-pill').forEach(pill=>{
+    const n = saOpen(pill.dataset.line).length;
+    const w = pill.querySelector('.sa-warn');
+    if(w) w.hidden = n===0;
+    pill.title = n ? n+' open startup action'+(n>1?'s':'') : 'Startup actions';
+  });
+}
+
+function saRender(){
+  const pop = document.getElementById('sa-pop'); if(!pop || !SA_LINE) return;
+  const admin = NovusCore.isAdmin();
+  const open = saOpen(SA_LINE);
+  const done = STARTUP_ACTIONS.filter(a=>a.line===SA_LINE && a.completed_at)
+    .sort((a,b)=>String(b.completed_at).localeCompare(String(a.completed_at))).slice(0,10);
+  const fmt = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  const row = (a,isDone) => `<div class="sa-item ${isDone?'sa-done':''}">`
+    + (admin ? `<input type="checkbox" ${isDone?'checked':''} onchange="saToggle('${saEsc(a.id)}',this.checked)" aria-label="Mark complete">` : '')
+    + `<div class="sa-txt">${saEsc(a.text)}<span class="sa-meta">${a.owner?saEsc(a.owner)+' · ':''}${isDone?'done '+fmt(a.completed_at):'added '+fmt(a.created_at)}</span></div>`
+    + (admin ? `<button class="sa-rm" onclick="saRemove('${saEsc(a.id)}')" title="Remove" aria-label="Remove">×</button>` : '')
+    + `</div>`;
+  let body = '';
+  if(!SA_DB_OK) body = '<div class="sa-empty">Startup actions need the database set up (run startup_actions.sql in Supabase).</div>';
+  else {
+    body += open.length ? open.map(a=>row(a,false)).join('') : '<div class="sa-empty">No open actions.</div>';
+    if(done.length){
+      body += `<button class="sa-toggle" onclick="SA_SHOW_DONE=!SA_SHOW_DONE;saRender()">${SA_SHOW_DONE?'▾':'▸'} Completed (${done.length})</button>`;
+      if(SA_SHOW_DONE) body += done.map(a=>row(a,true)).join('');
+    }
+    if(admin) body += `<div class="sa-add"><input id="sa-new" placeholder="Add an action…" maxlength="200" onkeydown="if(event.key==='Enter')saAdd()"><input class="sa-owner" id="sa-owner" placeholder="Owner (optional)" maxlength="40" onkeydown="if(event.key==='Enter')saAdd()"><button onclick="saAdd()">Add</button></div>`;
+  }
+  pop.innerHTML = `<div class="sa-head"><span>${saEsc(SA_LINE)} · Startup actions</span><button class="sa-x" onclick="saClose()" aria-label="Close">×</button></div><div class="sa-body">${body}</div>`;
+}
+
+let SA_PILL = null;
+function saPlace(){
+  const pop = document.getElementById('sa-pop'); if(!pop || !SA_PILL || !document.contains(SA_PILL)) return saClose();
+  const r = SA_PILL.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  if(r.bottom < 0 || r.top > innerHeight) return saClose();
+  let left = r.right + 8; if(left + pw > innerWidth - 8) left = Math.max(8, r.left - pw - 8);
+  let top = Math.min(r.top, innerHeight - ph - 8); if(top < 8) top = 8;
+  pop.style.left = left+'px'; pop.style.top = top+'px';
+}
+function saOpenFor(pill){
+  const pop = document.getElementById('sa-pop');
+  if(pop.classList.contains('sa-open') && SA_LINE===pill.dataset.line){ saClose(); return; }
+  SA_LINE = pill.dataset.line; SA_PILL = pill; SA_SHOW_DONE = false;
+  saRender(); pop.classList.add('sa-open'); saPlace();
+}
+function saClose(){ const p=document.getElementById('sa-pop'); if(p) p.classList.remove('sa-open'); SA_LINE=null; SA_PILL=null; }
+
+async function saRefresh(){ await loadStartupActions(); updateStartupBadges(); if(SA_LINE) saRender(); }
+async function saAdd(){
+  const t = document.getElementById('sa-new'), o = document.getElementById('sa-owner');
+  const text = (t.value||'').trim(); if(!text || !window.ACTIVE_PLANT) return;
+  const { error } = await NovusDB.startupActions.add({
+    id: (crypto.randomUUID ? crypto.randomUUID() : 'sa_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)),
+    plant_id: window.ACTIVE_PLANT.id, line: SA_LINE, text, owner: (o.value||'').trim(),
+    created_by: (NovusCore.getUser()||{}).username || ''
+  });
+  if(error){ NovusCore.Toast.error('Could not save action'); return; }
+  await saRefresh(); const n=document.getElementById('sa-new'); if(n) n.focus();
+}
+async function saToggle(id, done){
+  const { error } = await NovusDB.startupActions.setDone(id, done, (NovusCore.getUser()||{}).username || '');
+  if(error) NovusCore.Toast.error('Could not update action');
+  await saRefresh();
+}
+async function saRemove(id){
+  const { error } = await NovusDB.startupActions.remove(id);
+  if(error) NovusCore.Toast.error('Could not remove action');
+  await saRefresh();
+}
+
+document.addEventListener('click', e=>{
+  const pill = e.target.closest && e.target.closest('.sa-pill');
+  if(pill){ saOpenFor(pill); return; }
+  const pop = document.getElementById('sa-pop');
+  if(pop && pop.classList.contains('sa-open') && !e.composedPath().includes(pop)) saClose(); // composedPath: the clicked button may already have been re-rendered away
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') saClose();
+  if((e.key==='Enter'||e.key===' ') && e.target.classList && e.target.classList.contains('sa-pill')){ e.preventDefault(); saOpenFor(e.target); }
+});
+window.addEventListener('scroll', e=>{ const p=document.getElementById('sa-pop'); if(p && e.target instanceof Node && p.contains(e.target)) return; if(SA_LINE) saPlace(); }, true);
+window.addEventListener('resize', ()=>{ if(SA_LINE) saPlace(); });
+
+if(window.NovusDB && NovusDB.startupActions && NovusDB.startupActions.subscribe){
+  NovusDB.startupActions.subscribe(()=>{ if(window.ACTIVE_PLANT) saRefresh(); });
 }
 </script>
 

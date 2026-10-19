@@ -27,3 +27,6 @@ Bottom tab bar (Hub / News / Dashboard / KPIs / Play Call) replaces the previous
 - KPI Boards tile drag-reorder / drag-from-library is mouse-only HTML5 DnD; on touch use the ⋮ menus.
 - Tested in headless Chromium at 390×844, 820×1180 and 844×390 with mocked data — please sanity-check on a real iPhone/Android.
 - `index.html` loads `novus-interactions.js` twice (pre-existing); harmless but worth removing.
+
+## Rebased on your 10/19 upload
+Applied on top of the newer repo (near-miss-by-department table + Startup Actions). Mobile handling for both: the near-miss table fits the Safety panel at phone width; the Startup Actions popover (tap a STARTUP pill) becomes a bottom sheet with 44px controls. Only `dds-dashboard.html` differed upstream; the rest were identical, so nothing was overwritten.
